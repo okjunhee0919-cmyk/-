@@ -1,0 +1,1074 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>앵글(ANGLE) - 아이돌 직캠 탐색 서비스</title>
+  <!--
+    앵글(ANGLE) 실행 버전 (2단계: 기능 구현)
+    - 파일 하나로 동작합니다. 더블클릭해서 브라우저로 열면 됩니다.
+    - 섹션 ID는 PRD와 동일합니다.
+    - 데이터는 브라우저(localStorage)에 저장됩니다. 서버 없이 동작하는 데모입니다.
+  -->
+  <style>
+
+    :root {
+      --accent: #ffd84d;        /* 메인 노랑 (버튼, 강조 배경) */
+      --accent-text: #a67c00;   /* 노랑 계열 글자색 (흰 배경에서도 읽히도록 진하게) */
+      --accent-soft: #fff4c2;   /* 연노랑 (태그, 칩 배경) */
+      --cream: #fffbea;         /* 아주 연한 노랑 (섹션 배경) */
+      --ink: #2b2a26;
+      --ink-sub: #7d7a6c;
+      --line: #f0ead2;
+      --bg: #fffef8;
+      --white: #ffffff;
+      --radius: 18px;
+      --shadow: 0 6px 20px rgba(120, 90, 0, 0.08);
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      font-family: "Gulim", "굴림", "GulimChe", "굴림체", sans-serif;
+      color: var(--ink);
+      background: var(--bg);
+      line-height: 1.6;
+    }
+    a { color: inherit; text-decoration: none; }
+    button { font-family: inherit; cursor: pointer; }
+    .wrap { max-width: 1080px; margin: 0 auto; padding: 0 20px; }
+    .spark { color: #f2b705; font-size: 0.8em; }
+
+    /* ---------- 페이지 구분 라벨 (뼈대 확인용) ---------- */
+    .page-label {
+      max-width: 1080px; margin: 56px auto 16px; padding: 0 20px;
+      font-size: 13px; font-weight: 600; color: var(--accent-text);
+      letter-spacing: 0.04em;
+    }
+    .page-label::before { content: "✦ "; color: var(--accent); }
+
+    /* ---------- 공통 버튼 / 칩 ---------- */
+    .btn {
+      border: none; border-radius: 999px; padding: 10px 20px;
+      font-size: 14px; font-weight: 600; transition: transform .15s;
+    }
+    .btn:hover { transform: translateY(-1px); }
+    .btn-primary { background: var(--accent); color: var(--ink); }
+    .btn-ghost { background: var(--accent-soft); color: var(--accent-text); }
+    .chip {
+      display: inline-block; padding: 7px 14px; border-radius: 999px;
+      background: var(--white); border: 1px solid var(--line);
+      font-size: 13px; color: var(--ink-sub);
+    }
+    .section-title { font-size: 20px; font-weight: 700; margin: 0 0 16px; }
+    .section-title .spark { margin-left: 4px; }
+
+    /* ---------- #main-navigation ---------- */
+    #main-navigation {
+      position: sticky; top: 0; z-index: 10;
+      background: rgba(255, 255, 255, 0.92); backdrop-filter: blur(8px);
+      border-bottom: 1px solid var(--line);
+    }
+    #main-navigation .wrap { display: flex; align-items: center; gap: 16px; height: 64px; }
+    .logo { font-size: 22px; font-weight: 800; letter-spacing: -0.02em; color: var(--ink); }
+    .logo span { color: #f2b705; }
+    .nav-search {
+      flex: 1; max-width: 420px; margin-left: auto;
+      border: 1px solid var(--line); background: var(--bg);
+      border-radius: 999px; padding: 9px 18px; font-size: 14px; color: var(--ink-sub);
+    }
+    .nav-login { margin-left: 4px; }
+
+    /* ---------- #hero-search ---------- */
+    #hero-search {
+      text-align: center; padding: 72px 20px 56px;
+      background: var(--cream);
+    }
+    #hero-search h1 { font-size: clamp(26px, 5vw, 40px); line-height: 1.3; margin: 0 0 10px; letter-spacing: -0.02em; }
+    #hero-search h1 em { font-style: normal; color: var(--accent-text); }
+    #hero-search p.lead { color: var(--ink-sub); margin: 0 0 28px; }
+    .hero-box {
+      max-width: 560px; margin: 0 auto 24px; display: flex; gap: 8px;
+      background: var(--white); border-radius: 999px; padding: 8px 8px 8px 24px;
+      box-shadow: var(--shadow); border: 1px solid var(--line); align-items: center;
+    }
+    .hero-box .input { flex: 1; text-align: left; color: var(--ink-sub); font-size: 15px; }
+    .hero-members { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+
+    /* ---------- #filter-panel ---------- */
+    #filter-panel { padding: 32px 0 8px; }
+    .filter-bar {
+      background: var(--white); border: 1px solid var(--line);
+      border-radius: var(--radius); padding: 16px; box-shadow: var(--shadow);
+      display: grid; grid-template-columns: repeat(5, 1fr) auto; gap: 10px; align-items: center;
+    }
+    .select {
+      border: 1px solid var(--line); border-radius: 12px; padding: 10px 14px;
+      font-size: 14px; color: var(--ink-sub); background: var(--bg);
+    }
+    .select::after { content: "⌄"; float: right; }
+
+    /* ---------- 카드 공통 ---------- */
+    .card-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; }
+    .card {
+      background: var(--white); border-radius: var(--radius);
+      border: 1px solid var(--line); overflow: hidden; transition: transform .2s, box-shadow .2s;
+    }
+    .card:hover { transform: translateY(-4px); box-shadow: var(--shadow); }
+    .thumb { aspect-ratio: 16 / 9; position: relative; }
+    .thumb.t1 { background: #fff0b3; }
+    .thumb.t2 { background: #ffe58a; }
+    .thumb.t3 { background: #f6f1de; }
+    .thumb.t4 { background: #fff7d6; }
+    .thumb::after {
+      content: "▶"; position: absolute; inset: 0; display: grid; place-items: center;
+      color: rgba(43,42,38,.45); font-size: 26px;
+    }
+    .card-body { padding: 14px 16px 16px; }
+    .card-title { font-size: 15px; font-weight: 600; margin: 0 0 4px; line-height: 1.4; }
+    .card-meta { font-size: 12.5px; color: var(--ink-sub); }
+    .card-tag {
+      display: inline-block; font-size: 11.5px; font-weight: 600; color: var(--accent-text);
+      background: var(--accent-soft); padding: 2px 9px; border-radius: 999px; margin-bottom: 8px;
+    }
+
+    /* ---------- #fancam-list ---------- */
+    #fancam-list { padding: 40px 0; }
+    .list-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+    .list-head .section-title { margin: 0; }
+    .sort { display: flex; gap: 6px; }
+    .sort .chip.active { background: var(--accent); border-color: var(--accent); color: var(--ink); font-weight: 700; }
+    .more { text-align: center; margin-top: 32px; }
+
+    /* ---------- #trending-weekly ---------- */
+    #trending-weekly { padding: 40px 0 64px; background: var(--white); border-top: 1px solid var(--line); }
+    .trend-card { position: relative; }
+    .rank {
+      position: absolute; top: 10px; left: 10px; z-index: 1;
+      width: 28px; height: 28px; border-radius: 50%;
+      background: var(--white); color: var(--ink); font-weight: 800; font-size: 13px;
+      display: grid; place-items: center; box-shadow: 0 2px 8px rgba(0,0,0,.08);
+    }
+    .trend-card:nth-child(1) .rank { background: var(--accent); color: var(--ink); }
+
+    /* ---------- #site-footer ---------- */
+    #site-footer { padding: 32px 0; text-align: center; font-size: 13px; color: var(--ink-sub); background: var(--bg); border-top: 1px solid var(--line); }
+    #site-footer .links { margin-top: 6px; }
+    #site-footer .links a { margin: 0 8px; text-decoration: underline; text-underline-offset: 3px; }
+
+    /* ---------- 상세 페이지 ---------- */
+    .detail { max-width: 860px; margin: 0 auto; padding: 0 20px 24px; }
+    #player-area .player {
+      aspect-ratio: 16 / 9; border-radius: var(--radius);
+      background: #2b2a26;
+      display: grid; place-items: center; color: rgba(255,255,255,.85); font-size: 14px;
+      box-shadow: var(--shadow);
+    }
+    #fancam-meta { padding: 20px 0; border-bottom: 1px solid var(--line); }
+    #fancam-meta h2 { font-size: 22px; margin: 6px 0 8px; }
+    #fancam-meta .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 12px; }
+    #related-fancams { padding: 28px 0 8px; }
+    #related-fancams .card-grid { grid-template-columns: repeat(3, 1fr); }
+    #report-button { padding: 8px 0 24px; text-align: right; }
+    #report-button button {
+      background: none; border: none; color: var(--ink-sub); font-size: 13px;
+      text-decoration: underline; text-underline-offset: 3px;
+    }
+
+    /* ---------- 마이페이지 / 관리자 ---------- */
+    .panel-page { max-width: 860px; margin: 0 auto; padding: 0 20px; }
+    .panel {
+      background: var(--white); border: 1px solid var(--line);
+      border-radius: var(--radius); padding: 24px; margin-bottom: 20px; box-shadow: var(--shadow);
+    }
+    .panel .card-grid { grid-template-columns: repeat(3, 1fr); }
+    .member-list { display: flex; flex-wrap: wrap; gap: 14px; }
+    .member { text-align: center; font-size: 13px; }
+    .avatar {
+      width: 64px; height: 64px; border-radius: 50%; margin: 0 auto 6px;
+      background: var(--accent-soft);
+      border: 2px solid var(--white); box-shadow: 0 0 0 2px var(--accent-soft);
+    }
+    .form-row { display: flex; gap: 8px; flex-wrap: wrap; }
+    .form-row .input {
+      flex: 1; min-width: 200px; border: 1px solid var(--line); border-radius: 12px;
+      padding: 11px 14px; font-size: 14px; color: var(--ink-sub); background: var(--bg);
+    }
+    .form-row.grid4 { display: grid; grid-template-columns: repeat(4, 1fr); margin-bottom: 14px; }
+    .report-item {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 12px 0; border-bottom: 1px solid var(--line); font-size: 14px;
+    }
+    .report-item:last-child { border-bottom: none; }
+    .badge-admin {
+      font-size: 11px; font-weight: 700; color: var(--accent);
+      background: var(--cream); padding: 2px 10px; border-radius: 999px; margin-left: 8px;
+    }
+    .id-note { font-size: 11px; color: #b8b5cc; font-family: monospace; margin: 0 0 6px; }
+
+    /* ---------- 반응형 (모바일 우선 대응) ---------- */
+    @media (max-width: 900px) {
+      .card-grid { grid-template-columns: repeat(2, 1fr); }
+      .filter-bar { grid-template-columns: repeat(2, 1fr); }
+      .filter-bar .btn { grid-column: span 2; }
+    }
+    @media (max-width: 560px) {
+      .nav-search { display: none; }
+      .nav-login { margin-left: auto; }
+      #hero-search { padding: 48px 16px 40px; }
+      .hero-box { padding-left: 16px; }
+      .card-grid, #related-fancams .card-grid, .panel .card-grid { gap: 12px; }
+      #related-fancams .card-grid, .panel .card-grid { grid-template-columns: repeat(2, 1fr); }
+      .list-head { flex-direction: column; align-items: flex-start; gap: 10px; }
+      .form-row.grid4 { grid-template-columns: repeat(2, 1fr); }
+    }
+  
+
+    /* ---------- 실행 버전 추가 스타일 ---------- */
+    .view { display: none; }
+    .view.active { display: block; }
+    a.card { display: block; color: inherit; }
+    .thumb.has-img { background-size: cover; background-position: center; }
+    .thumb.has-img::after { color: #fff; text-shadow: 0 2px 8px rgba(0,0,0,.45); }
+    .thumb .sample-badge {
+      position: absolute; top: 8px; right: 8px; z-index: 1; font-size: 11px;
+      background: rgba(255,255,255,.9); color: var(--ink-sub); padding: 2px 8px; border-radius: 999px;
+    }
+    select.select, input.select { width: 100%; font-family: inherit; outline: none; appearance: none; -webkit-appearance: none; color: var(--ink); }
+    select.select { background-image: linear-gradient(45deg, transparent 50%, var(--ink-sub) 50%), linear-gradient(135deg, var(--ink-sub) 50%, transparent 50%); background-position: calc(100% - 18px) 50%, calc(100% - 13px) 50%; background-size: 5px 5px, 5px 5px; background-repeat: no-repeat; padding-right: 32px; }
+    select.select:focus, input.select:focus, input.input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+    input.input { font-family: inherit; outline: none; color: var(--ink); }
+    input.nav-search { flex: 1; max-width: 420px; margin-left: auto; font-family: inherit; outline: none; color: var(--ink); }
+    .hero-box input.input { border: none; background: transparent; padding: 8px 0; font-size: 15px; }
+    .hero-box input.input:focus { box-shadow: none; }
+    .chip.clickable { cursor: pointer; }
+    .chip.clickable:hover { border-color: var(--accent); background: var(--accent-soft); }
+    .sort .chip { cursor: pointer; user-select: none; }
+    .empty { text-align: center; padding: 56px 0; color: var(--ink-sub); }
+    .result-count { font-size: 13px; color: var(--ink-sub); margin: -6px 0 14px; }
+    .btn[disabled] { opacity: .45; cursor: not-allowed; transform: none; }
+    .btn.fav-on { background: var(--accent); color: var(--ink); }
+    .guard { text-align: center; padding: 72px 20px; color: var(--ink-sub); }
+    .guard .btn { margin-top: 14px; }
+    .page-title { max-width: 860px; margin: 0 auto; padding: 32px 20px 16px; font-size: 24px; font-weight: 700; }
+    .back-link { display: inline-block; margin: 24px 0 14px; font-size: 14px; color: var(--ink-sub); }
+    .back-link:hover { color: var(--ink); }
+    .player iframe { width: 100%; height: 100%; border: 0; border-radius: var(--radius); }
+    .player.has-video { background: #000; display: block; }
+    .toast {
+      position: fixed; left: 50%; bottom: 28px; transform: translate(-50%, 20px); opacity: 0;
+      background: var(--ink); color: #fff; padding: 11px 20px; border-radius: 999px; font-size: 14px;
+      transition: all .25s; z-index: 50; pointer-events: none;
+    }
+    .toast.show { opacity: 1; transform: translate(-50%, 0); }
+    dialog { border: none; border-radius: var(--radius); padding: 28px; width: min(360px, 90vw); box-shadow: 0 20px 60px rgba(0,0,0,.2); font-family: inherit; color: var(--ink); }
+    dialog::backdrop { background: rgba(43,42,38,.35); }
+    dialog h3 { margin: 0 0 6px; font-size: 18px; }
+    dialog p { margin: 0 0 16px; font-size: 13px; color: var(--ink-sub); }
+    dialog .input { width: 100%; border: 1px solid var(--line); border-radius: 12px; padding: 11px 14px; font-size: 14px; background: var(--bg); margin-bottom: 12px; }
+    dialog label.check { display: flex; gap: 8px; align-items: center; font-size: 13px; margin-bottom: 18px; cursor: pointer; }
+    dialog .actions { display: flex; gap: 8px; justify-content: flex-end; }
+    .nav-user { font-size: 13px; color: var(--ink-sub); margin-left: 4px; }
+    .nav-links { display: flex; gap: 6px; align-items: center; }
+    .nav-links a { font-size: 13px; padding: 6px 12px; border-radius: 999px; color: var(--ink-sub); }
+    .nav-links a:hover { background: var(--accent-soft); color: var(--ink); }
+    .form-row .select { flex: 1; min-width: 140px; }
+    .form-row.grid4 { grid-template-columns: repeat(5, 1fr); }
+    .hint { font-size: 12.5px; color: var(--ink-sub); margin: 10px 0 0; }
+    .report-item .meta { color: var(--ink-sub); font-size: 12.5px; }
+    .report-item.done { opacity: .5; }
+    #site-footer .links button { background: none; border: none; color: inherit; font: inherit; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; margin: 0 8px; }
+    .filter-bar.live { grid-template-columns: repeat(2, 1fr) auto; }
+    .filter-bar.live .only-curated { display: none; }
+    @media (max-width: 900px) { .filter-bar.live { grid-template-columns: repeat(2, 1fr); } }
+    .live-banner { display: inline-block; margin-top: 18px; padding: 8px 16px; background: var(--white); border: 1px dashed var(--accent); border-radius: 999px; font-size: 13px; color: var(--ink-sub); }
+    .live-banner button { background: none; border: none; font: inherit; font-weight: 700; color: var(--accent-text); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; padding: 0; }
+    dialog .steps { font-size: 12.5px; color: var(--ink-sub); line-height: 1.7; margin: 0 0 14px; }
+    [hidden] { display: none !important; }
+    @media (max-width: 900px) { .form-row.grid4 { grid-template-columns: repeat(2, 1fr); } .nav-links { display: none; } }
+    @media (max-width: 560px) { input.nav-search { display: none; } }
+  </style>
+</head>
+<body>
+
+<!-- 공통: 상단 네비게이션 -->
+<header id="main-navigation">
+  <div class="wrap">
+    <a href="#/" class="logo">ANGLE<span>.</span></a>
+    <input id="nav-search-input" class="nav-search select" type="search" placeholder="멤버, 곡, 무대를 검색해 보세요" autocomplete="off">
+    <nav class="nav-links">
+      <a href="#/">홈</a>
+      <a href="#/mypage">마이페이지</a>
+      <a href="#/admin" id="nav-admin-link" hidden>관리자</a>
+    </nav>
+    <span class="nav-user" id="nav-user"></span>
+    <button class="btn btn-ghost nav-login" id="btn-login">로그인</button>
+  </div>
+</header>
+
+<!-- PAGE 1. 메인 페이지 ( #/ ) -->
+<div id="page-main" class="view">
+  <main>
+    <section id="hero-search">
+      <h1>내 최애의 <em>그 무대</em>,<br>바로 찾아드려요 <span class="spark">✦</span></h1>
+      <p class="lead">멤버 · 곡 · 무대 · 날짜로 직캠을 한 번에</p>
+      <form class="hero-box" id="hero-form">
+        <input id="hero-input" class="input" type="search" placeholder="어떤 직캠을 찾고 있나요?" autocomplete="off">
+        <button class="btn btn-primary" type="submit">검색</button>
+      </form>
+      <div class="hero-members" id="hero-members"></div>
+      <div class="live-banner" id="live-hint" hidden></div>
+    </section>
+
+    <section id="filter-panel">
+      <div class="wrap">
+        <div class="filter-bar">
+          <select class="select only-curated" id="f-group" aria-label="그룹"></select>
+          <select class="select only-curated" id="f-member" aria-label="멤버"></select>
+          <select class="select only-curated" id="f-song" aria-label="곡"></select>
+          <select class="select" id="f-stage" aria-label="무대 유형"></select>
+          <select class="select" id="f-period" aria-label="기간"></select>
+          <button class="btn btn-ghost" id="f-reset">초기화</button>
+        </div>
+      </div>
+    </section>
+
+    <section id="fancam-list">
+      <div class="wrap">
+        <div class="list-head">
+          <h2 class="section-title">직캠 모아보기 <span class="spark">✦</span></h2>
+          <div class="sort" id="sort-chips">
+            <span class="chip active" data-sort="latest">최신순</span>
+            <span class="chip" data-sort="views">조회수순</span>
+          </div>
+        </div>
+        <div class="result-count" id="result-count"></div>
+        <div class="card-grid" id="list-grid"></div>
+        <div class="more"><button class="btn btn-ghost" id="btn-more">더보기</button></div>
+      </div>
+    </section>
+
+    <section id="trending-weekly">
+      <div class="wrap">
+        <h2 class="section-title">이번 주 인기 직캠 <span class="spark">✦</span></h2>
+        <div class="card-grid" id="trend-grid"></div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<!-- PAGE 2. 직캠 상세 페이지 ( #/fancam/:id ) -->
+<div id="page-detail" class="view">
+  <div class="detail">
+    <a class="back-link" href="#/">← 목록으로</a>
+    <div id="detail-body"></div>
+  </div>
+</div>
+
+<!-- PAGE 3. 마이페이지 ( #/mypage ) - 로그인 필요 -->
+<div id="page-mypage" class="view">
+  <h1 class="page-title">마이페이지</h1>
+  <div id="mypage-guard" class="guard" hidden>
+    로그인하면 마음에 드는 직캠과 멤버를 저장할 수 있어요.<br>
+    <button class="btn btn-primary" data-open-login>로그인</button>
+  </div>
+  <div id="mypage-content" class="panel-page">
+    <section id="favorite-fancams" class="panel">
+      <h2 class="section-title">저장한 직캠 <span class="spark">✦</span></h2>
+      <div class="card-grid" id="fav-fancam-grid"></div>
+    </section>
+    <section id="favorite-members" class="panel">
+      <h2 class="section-title">내 최애 멤버 <span class="spark">✦</span></h2>
+      <div class="member-list" id="fav-member-list"></div>
+      <p class="hint" id="fav-member-hint"></p>
+    </section>
+  </div>
+</div>
+
+<!-- PAGE 4. 관리자 페이지 ( #/admin ) - 관리자 권한 필요 -->
+<div id="page-admin" class="view">
+  <h1 class="page-title">관리자 <span class="badge-admin">ADMIN</span></h1>
+  <div id="admin-guard" class="guard" hidden>
+    관리자만 들어올 수 있는 페이지예요.<br>
+    로그인할 때 "관리자(데모)"를 체크해 주세요.<br>
+    <button class="btn btn-primary" data-open-login>로그인</button>
+  </div>
+  <div id="admin-content" class="panel-page" style="padding-bottom:64px;">
+    <section id="admin-add-form" class="panel">
+      <h2 class="section-title">직캠 등록</h2>
+      <div class="form-row">
+        <input id="a-url" class="input" type="text" placeholder="유튜브 링크를 붙여넣어 주세요">
+        <button class="btn btn-ghost" id="a-fetch" type="button">제목 불러오기</button>
+      </div>
+      <div class="form-row" style="margin-top:8px;">
+        <input id="a-title" class="input" type="text" placeholder="제목 (자동으로 안 불러와지면 직접 입력)">
+        <input id="a-channel" class="input" type="text" placeholder="채널명">
+        <button class="btn btn-primary" id="a-add" type="button">등록</button>
+      </div>
+      <p class="hint">등록하면 "태그 대기" 상태가 되고, 아래에서 멤버·곡·무대를 정해 저장해야 공개됩니다.</p>
+    </section>
+
+    <section id="admin-tag-editor" class="panel">
+      <h2 class="section-title">태그 편집</h2>
+      <div class="form-row" style="margin-bottom:10px;">
+        <select class="select" id="t-target"></select>
+      </div>
+      <div class="form-row grid4">
+        <select class="select" id="t-group"></select>
+        <select class="select" id="t-member"></select>
+        <select class="select" id="t-song"></select>
+        <select class="select" id="t-stage"></select>
+        <input class="select" id="t-date" type="date">
+      </div>
+      <button class="btn btn-primary" id="t-save">저장하고 공개</button>
+    </section>
+
+    <section id="admin-reports" class="panel">
+      <h2 class="section-title">신고 목록</h2>
+      <div id="report-list"></div>
+    </section>
+  </div>
+</div>
+
+<!-- 공통: 푸터 -->
+<footer id="site-footer">
+  <div class="wrap">
+    <div>ANGLE은 영상을 저장하지 않으며, 유튜브 임베드와 원본 링크만 사용합니다.</div>
+    <div class="links"><button id="btn-reset-demo">데모 데이터 초기화</button></div>
+  </div>
+</footer>
+
+<!-- 로그인 창 -->
+<dialog id="login-dialog">
+  <form method="dialog" id="login-form">
+    <h3>로그인</h3>
+    <p>데모 버전이라 닉네임만 입력하면 돼요. (실서비스에서는 구글 로그인으로 교체)</p>
+    <input id="login-name" class="input" type="text" placeholder="닉네임" maxlength="12">
+    <label class="check"><input type="checkbox" id="login-admin"> 관리자(데모)</label>
+    <div class="actions">
+      <button class="btn btn-ghost" value="cancel" formnovalidate>취소</button>
+      <button class="btn btn-primary" id="login-submit" value="ok">로그인</button>
+    </div>
+  </form>
+</dialog>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* =========================================================
+   앵글(ANGLE) 앱 로직
+   1) 데이터  2) 저장소  3) 유틸  4) 화면 그리기  5) 이벤트  6) 라우터
+   ========================================================= */
+(function () {
+  'use strict';
+
+  /* ---------- 1) 기본 데이터 (가상의 그룹/멤버/곡) ---------- */
+  const STAGES = ['음악방송', '페스티벌', '행사'];
+  const PERIODS = [
+    { v: '7', label: '최근 7일' },
+    { v: '30', label: '최근 30일' },
+    { v: '365', label: '최근 1년' }
+  ];
+  const GROUPS = [
+    { id: 'g1', name: '그룹 A' },
+    { id: 'g2', name: '그룹 B' },
+    { id: 'g3', name: '그룹 C' }
+  ];
+  const MEMBERS = [];
+  const SONGS = [];
+  GROUPS.forEach((g, gi) => {
+    for (let mi = 0; mi < 5; mi++) {
+      MEMBERS.push({ id: 'm' + gi + mi, group: g.id, name: '멤버' + g.name.slice(-1) + (mi + 1) });
+    }
+    ['첫 번째 곡', '두 번째 곡'].forEach((t, si) => {
+      SONGS.push({ id: 's' + gi + si, group: g.id, title: g.name.slice(-1) + ' - ' + t });
+    });
+  });
+  const CHANNELS = ['채널 하나', '채널 둘', '채널 셋', '채널 넷'];
+
+  function dayStr(n) {
+    const d = new Date(); d.setDate(d.getDate() - n);
+    const y = d.getFullYear(), m = String(d.getMonth() + 1).padStart(2, '0'), dd = String(d.getDate()).padStart(2, '0');
+    return y + '-' + m + '-' + dd;
+  }
+
+  // 샘플 직캠 36개 (영상 ID가 없어서 재생은 안 되는 샘플)
+  function makeSeed() {
+    const list = [];
+    for (let i = 0; i < 36; i++) {
+      const gi = i % 3, si = Math.floor(i / 3) % 2, slot = Math.floor(i / 12);
+      const mi = (i * 2 + 1) % 5;
+      const g = GROUPS[gi], m = MEMBERS.find(x => x.id === 'm' + gi + mi), s = SONGS.find(x => x.id === 's' + gi + si);
+      list.push({
+        id: 'f' + (i + 1), videoId: '', title: '[직캠] ' + m.name + ' - ' + s.title.split(' - ')[1] + ' (' + g.name + ')',
+        channel: CHANNELS[i % 4], groupId: g.id, memberId: m.id, songId: s.id,
+        stage: STAGES[(slot + si) % 3], stageDate: dayStr(slot * 9 + gi * 2 + 1), views: ((i * 7919) % 290 + 10) * 1000,
+        status: 'published', sample: true
+      });
+    }
+    return list;
+  }
+
+  /* ---------- 2) 저장소 (localStorage) ---------- */
+  const KEY = { fancams: 'angle_fancams_v1', favs: 'angle_favs_v1', user: 'angle_user_v1', reports: 'angle_reports_v1' };
+  function load(key, fallback) {
+    try { const v = JSON.parse(localStorage.getItem(key)); return v == null ? fallback : v; } catch (e) { return fallback; }
+  }
+  function save(key, val) { try { localStorage.setItem(key, JSON.stringify(val)); } catch (e) {} }
+
+  let fancams = load(KEY.fancams, null);
+  if (!fancams) { fancams = makeSeed(); save(KEY.fancams, fancams); }
+  let favs = load(KEY.favs, { fancams: [], members: [] });
+  let user = load(KEY.user, null);
+  let reports = load(KEY.reports, []);
+
+  /* ---------- 3) 유틸 ---------- */
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const groupOf = (id) => GROUPS.find(g => g.id === id);
+  const memberOf = (id) => MEMBERS.find(m => m.id === id);
+  const songOf = (id) => SONGS.find(s => s.id === id);
+
+  function fmtViews(v) {
+    if (v >= 10000) return (v / 10000).toFixed(1).replace('.0', '') + '만';
+    return v.toLocaleString();
+  }
+  function daysSince(dateStr) {
+    return Math.floor((Date.now() - new Date(dateStr + 'T00:00:00').getTime()) / 86400000);
+  }
+  function ago(dateStr) {
+    const d = daysSince(dateStr);
+    if (d <= 0) return '오늘';
+    if (d < 7) return d + '일 전';
+    if (d < 30) return Math.floor(d / 7) + '주 전';
+    if (d < 365) return Math.floor(d / 30) + '개월 전';
+    return Math.floor(d / 365) + '년 전';
+  }
+  function parseVideoId(url) {
+    const s = String(url).trim();
+    const m = s.match(/(?:youtu\.be\/|[?&]v=|\/shorts\/|\/embed\/)([A-Za-z0-9_-]{11})/);
+    if (m) return m[1];
+    return /^[A-Za-z0-9_-]{11}$/.test(s) ? s : '';
+  }
+  let toastTimer;
+  function toast(msg) {
+    const t = $('toast'); t.textContent = msg; t.classList.add('show');
+    clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('show'), 2200);
+  }
+  const published = () => fancams.filter(f => f.status === 'published');
+  const isAdmin = () => !!(user && user.admin);
+
+  /* ---------- 실시간 YouTube 검색 (API 키를 연결했을 때) ---------- */
+  const LIVE_KEY = 'angle_ytkey_v1', LC_KEY = 'angle_livecache_v1', HID_KEY = 'angle_hidden_v1', QC_KEY = 'angle_qcache_v1';
+  let serverOn = false;   // 서버(/api/youtube)가 연결돼 있으면 true
+  let liveCache = load(LC_KEY, {});
+  let hiddenLive = load(HID_KEY, []);
+  let qCache = load(QC_KEY, {});
+  let liveState = { sig: '', items: [], next: '', loading: false, error: '' };
+  let liveReq = 0;
+  const live = () => serverOn;
+  const LIVE_SUGGEST = ['음악방송 직캠', '페스티벌 직캠', '대학 축제 직캠', '컴백 무대', '4K 직캠'];
+
+  async function ytApi(path, params) {
+    const p = new URLSearchParams(Object.assign({ path: path }, params));
+    let r, j;
+    try { r = await fetch('/api/youtube?' + p.toString()); j = await r.json(); }
+    catch (e) { throw new Error('인터넷 연결을 확인해 주세요.'); }
+    if (!r.ok || j.error) {
+      const er = j.error || {};
+      const reason = (er.errors && er.errors[0] && er.errors[0].reason) || '';
+      let msg = er.message || '유튜브 요청에 실패했어요.';
+      if (reason === 'quotaExceeded' || reason === 'dailyLimitExceeded') msg = '오늘 무료 검색 한도를 다 썼어요. 내일 다시 이용해 주세요.';
+      else if (reason === 'keyInvalid' || reason === 'badRequest') msg = '서버의 API 키가 올바르지 않아요.';
+      else if (reason === 'accessNotConfigured' || reason === 'forbidden') msg = '서버의 API 키에 "YouTube Data API v3"가 사용 설정되지 않았어요.';
+      else if (reason === 'noServerKey') msg = '서버에 API 키가 설정되지 않았어요.';
+      throw new Error(msg);
+    }
+    return j;
+  }
+  function dayISO(days) { const d = new Date(Date.now() - days * 86400000); d.setHours(0, 0, 0, 0); return d.toISOString(); }
+  function toItem(x, stage) {
+    const sn = x.snippet || {}, st = x.statistics || {};
+    return { id: 'yt_' + x.id, videoId: x.id, title: sn.title || '(제목 없음)', channel: sn.channelTitle || '채널 미상',
+      groupId: '', memberId: '', songId: '', stage: stage || '직캠', stageDate: String(sn.publishedAt || '').slice(0, 10) || dayStr(0),
+      views: parseInt(st.viewCount || '0', 10) || 0, status: 'published', sample: false, live: true };
+  }
+  function cacheItem(it) {
+    liveCache[it.id] = it;
+    const keys = Object.keys(liveCache);
+    if (keys.length > 400) { keys.slice(0, keys.length - 400).forEach(k => { if (!favs.fancams.includes(k)) delete liveCache[k]; }); }
+  }
+  function persistLive() { save(LC_KEY, liveCache); const ks = Object.keys(qCache); if (ks.length > 40) ks.slice(0, ks.length - 40).forEach(k => delete qCache[k]); save(QC_KEY, qCache); }
+
+  async function searchLive(o) {
+    const terms = [o.q, o.stage].filter(Boolean).join(' ').trim();
+    const query = !terms ? '아이돌 직캠' : (/직캠/.test(terms) ? terms : terms + ' 직캠');
+    const params = { part: 'snippet', type: 'video', maxResults: String(o.max || 12), q: query,
+      order: o.sort === 'views' ? 'viewCount' : 'date', videoEmbeddable: 'true', regionCode: 'KR', relevanceLanguage: 'ko', safeSearch: 'moderate' };
+    if (o.period) params.publishedAfter = dayISO(parseInt(o.period, 10));
+    if (o.pageToken) params.pageToken = o.pageToken;
+    const ck = JSON.stringify(params);
+    const hit = qCache[ck];
+    if (hit && Date.now() - hit.t < 3600000) { hit.v.items.forEach(cacheItem); return hit.v; }   // 1시간 캐시 (API 할당량 절약)
+    const s = await ytApi('search', params);
+    const ids = (s.items || []).map(i => i.id && i.id.videoId).filter(Boolean);
+    let items = [];
+    if (ids.length) {
+      const v = await ytApi('videos', { part: 'snippet,statistics', id: ids.join(',') });
+      const by = {}; (v.items || []).forEach(x => { by[x.id] = x; });
+      items = ids.map(id => by[id]).filter(Boolean).map(x => toItem(x, o.stage));
+    }
+    const out = { items: items, next: s.nextPageToken || '' };
+    items.forEach(cacheItem);
+    qCache[ck] = { t: Date.now(), v: out };
+    persistLive();
+    return out;
+  }
+
+  function liveSig() { return [filter.q, filter.stage, filter.period, filter.sort].join('|'); }
+  function drawLive() {
+    const L = liveState;
+    $('result-count').textContent = (L.loading && !L.items.length) ? '유튜브에서 찾는 중...' : (L.items.length ? L.items.length + '개 불러왔어요' : '');
+    $('list-grid').innerHTML = L.items.length ? L.items.map(f => cardHTML(f)).join('')
+      : '<div class="empty" style="grid-column:1/-1">' + (L.loading ? '잠시만요 ✦' : (L.error ? esc(L.error) : '검색 결과가 없어요.<br>검색어를 바꾸거나 기간을 넓혀 보세요.')) + '</div>';
+    const b = $('btn-more');
+    b.style.display = (L.next && !L.error) ? '' : 'none';
+    b.disabled = L.loading; b.textContent = L.loading ? '불러오는 중...' : '더보기';
+  }
+  async function loadLive(more) {
+    const sig = liveSig(), rid = ++liveReq;
+    if (!more) liveState = { sig: sig, items: [], next: '', loading: true, error: '' };
+    else { if (liveState.loading || !liveState.next) return; liveState.loading = true; }
+    drawLive();
+    try {
+      const r = await searchLive({ q: filter.q, stage: filter.stage, sort: filter.sort, period: filter.period, pageToken: more ? liveState.next : '' });
+      if (rid !== liveReq) return;
+      const seen = new Set(liveState.items.map(x => x.id));
+      r.items.forEach(x => { if (!seen.has(x.id) && !hiddenLive.includes(x.id)) liveState.items.push(x); });
+      liveState.next = r.next; liveState.error = '';
+    } catch (e) {
+      if (rid !== liveReq) return;
+      liveState.error = e.message || '검색에 실패했어요.';
+      if (liveState.items.length) toast(liveState.error);
+    }
+    liveState.loading = false; drawLive();
+  }
+  function renderListLive() {
+    if (liveState.sig === liveSig() && (liveState.items.length || liveState.loading)) drawLive();
+    else loadLive(false);
+  }
+  async function renderTrendingLive() {
+    const grid = $('trend-grid');
+    grid.innerHTML = '<div class="empty" style="grid-column:1/-1">불러오는 중...</div>';
+    try {
+      const r = await searchLive({ q: '', sort: 'views', period: '7', max: 4 });
+      if (!live()) return;
+      const list = r.items.filter(x => !hiddenLive.includes(x.id)).slice(0, 4);
+      grid.innerHTML = list.length ? list.map((f, i) => cardHTML(f, i + 1)).join('') : '<div class="empty" style="grid-column:1/-1">집계할 영상이 아직 없어요.</div>';
+    } catch (e) { grid.innerHTML = '<div class="empty" style="grid-column:1/-1">' + esc(e.message) + '</div>'; }
+  }
+  function renderHeroMembersLive() {
+    $('hero-members').innerHTML = LIVE_SUGGEST.map(t => '<span class="chip clickable" data-q="' + esc(t) + '">#' + esc(t) + '</span>').join('');
+  }
+  function renderList() { return live() ? renderListLive() : renderListCurated(); }
+  function renderTrending() { return live() ? renderTrendingLive() : renderTrendingCurated(); }
+  function renderHeroMembers() { return live() ? renderHeroMembersLive() : renderHeroMembersCurated(); }
+  function applyMode() {
+    const on = live();
+    const fb = document.querySelector('.filter-bar'); if (fb) fb.classList.toggle('live', on);
+    const hint = $('live-hint');
+    hint.hidden = on;
+    hint.innerHTML = on ? '' : '지금은 <b>샘플 화면</b>이에요. 서버에 연결되면(배포 후) 실제 유튜브 직캠이 검색돼요.';
+  }
+  function findAny(id) { return fancams.find(x => x.id === id) || liveCache[id] || null; }
+  function getFancam(id, adminOk) {
+    const c = fancams.find(x => x.id === id && (x.status === 'published' || (adminOk && isAdmin())));
+    if (c) return c;
+    if (String(id).indexOf('yt_') === 0 && !hiddenLive.includes(id)) return liveCache[id] || null;
+    return null;
+  }
+  function fetchLiveDetail(id) {
+    if (String(id).indexOf('yt_') !== 0 || !serverOn || hiddenLive.includes(id)) return false;
+    $('detail-body').innerHTML = '<div class="empty">불러오는 중...</div>';
+    ytApi('videos', { part: 'snippet,statistics', id: id.slice(3) }).then(v => {
+      if (v.items && v.items[0]) { cacheItem(toItem(v.items[0])); persistLive(); if (currentDetailId() === id) renderDetail(id); }
+      else $('detail-body').innerHTML = '<div class="empty">찾을 수 없는 직캠이에요.<br><a href="#/" style="text-decoration:underline">목록으로 돌아가기</a></div>';
+    }).catch(e => { $('detail-body').innerHTML = '<div class="empty">' + esc(e.message) + '</div>'; });
+    return true;
+  }
+
+  /* ---------- 4) 화면 그리기 ---------- */
+  function cardHTML(f, rank) {
+    const hasImg = !!f.videoId;
+    const bg = hasImg ? ' style="background-image:url(https://i.ytimg.com/vi/' + esc(f.videoId) + '/hqdefault.jpg)"' : '';
+    const tone = 't' + (((parseInt(String(f.id).replace(/\D/g, ''), 10) || 0) % 4) + 1);
+    return '<a class="card' + (rank ? ' trend-card' : '') + '" href="#/fancam/' + esc(f.id) + '">' +
+      (rank ? '<span class="rank">' + rank + '</span>' : '') +
+      '<div class="thumb ' + tone + (hasImg ? ' has-img' : '') + '"' + bg + '>' + (f.sample ? '<span class="sample-badge">샘플</span>' : '') + '</div>' +
+      '<div class="card-body"><span class="card-tag">' + esc(f.stage) + '</span>' +
+      '<h3 class="card-title">' + esc(f.title) + '</h3>' +
+      '<div class="card-meta">' + esc(f.channel) + ' · 조회수 ' + fmtViews(f.views) + ' · ' + ago(f.stageDate) + '</div></div></a>';
+  }
+
+  function fillSelect(sel, items, placeholder, value) {
+    sel.innerHTML = '<option value="">' + esc(placeholder) + '</option>' +
+      items.map(i => '<option value="' + esc(i.v) + '">' + esc(i.label) + '</option>').join('');
+    sel.value = value || '';
+    if (sel.value !== (value || '')) sel.value = '';
+  }
+
+  /* --- 메인: 필터 상태 --- */
+  const PAGE_SIZE = 8;
+  let skipNextRoute = false;
+  const filter = { q: '', group: '', member: '', song: '', stage: '', period: '', sort: 'latest', limit: PAGE_SIZE };
+
+  function writeFilterToURL() {
+    const p = new URLSearchParams();
+    ['q', 'group', 'member', 'song', 'stage', 'period'].forEach(k => { if (filter[k]) p.set(k, filter[k]); });
+    if (filter.sort !== 'latest') p.set('sort', filter.sort);
+    const qs = p.toString();
+    const target = '#/' + (qs ? '?' + qs : '');
+    if (location.hash === target) return;
+    try { history.replaceState(null, '', target); }
+    catch (err) { skipNextRoute = true; location.hash = target; }   // file:// 등에서 replaceState가 막힐 때 대체
+  }
+  function readFilterFromURL(qs) {
+    const p = new URLSearchParams(qs || '');
+    filter.q = p.get('q') || ''; filter.group = p.get('group') || ''; filter.member = p.get('member') || '';
+    filter.song = p.get('song') || ''; filter.stage = p.get('stage') || ''; filter.period = p.get('period') || '';
+    filter.sort = p.get('sort') === 'views' ? 'views' : 'latest'; filter.limit = PAGE_SIZE;
+    const m = memberOf(filter.member);
+    if (m && !filter.group) filter.group = m.group;
+  }
+
+  function renderFilterControls() {
+    fillSelect($('f-group'), GROUPS.map(g => ({ v: g.id, label: g.name })), '그룹 전체', filter.group);
+    const ms = MEMBERS.filter(m => !filter.group || m.group === filter.group);
+    const ss = SONGS.filter(s => !filter.group || s.group === filter.group);
+    fillSelect($('f-member'), ms.map(m => ({ v: m.id, label: m.name })), '멤버 전체', filter.member);
+    fillSelect($('f-song'), ss.map(s => ({ v: s.id, label: s.title })), '곡 전체', filter.song);
+    fillSelect($('f-stage'), STAGES.map(s => ({ v: s, label: s })), '무대 전체', filter.stage);
+    fillSelect($('f-period'), PERIODS.map(p => ({ v: p.v, label: p.label })), '전체 기간', filter.period);
+    $('hero-input').value = filter.q; $('nav-search-input').value = filter.q;
+    document.querySelectorAll('#sort-chips .chip').forEach(c => c.classList.toggle('active', c.dataset.sort === filter.sort));
+  }
+
+  function filtered() {
+    const q = filter.q.trim().toLowerCase();
+    const list = published().filter(f => {
+      if (filter.group && f.groupId !== filter.group) return false;
+      if (filter.member && f.memberId !== filter.member) return false;
+      if (filter.song && f.songId !== filter.song) return false;
+      if (filter.stage && f.stage !== filter.stage) return false;
+      if (filter.period && daysSince(f.stageDate) > parseInt(filter.period, 10)) return false;
+      if (q) {
+        const hay = [f.title, f.channel, (groupOf(f.groupId) || {}).name, (memberOf(f.memberId) || {}).name, (songOf(f.songId) || {}).title].join(' ').toLowerCase();
+        if (!hay.includes(q)) return false;
+      }
+      return true;
+    });
+    list.sort(filter.sort === 'views'
+      ? (a, b) => b.views - a.views
+      : (a, b) => (b.stageDate.localeCompare(a.stageDate)) || (b.views - a.views));
+    return list;
+  }
+
+  function renderListCurated() {
+    const all = filtered();
+    const shown = all.slice(0, filter.limit);
+    $('result-count').textContent = '총 ' + all.length + '개';
+    $('list-grid').innerHTML = shown.length ? shown.map(f => cardHTML(f)).join('')
+      : '<div class="empty" style="grid-column:1/-1">조건에 맞는 직캠이 없어요.<br>필터를 바꾸거나 초기화해 보세요.</div>';
+    $('btn-more').style.display = all.length > shown.length ? '' : 'none';
+  }
+
+  function renderTrendingCurated() {
+    const pool = published();
+    let recent = pool.filter(f => daysSince(f.stageDate) <= 14);
+    if (recent.length < 4) recent = pool;
+    const top = recent.slice().sort((a, b) => b.views - a.views).slice(0, 4);
+    $('trend-grid').innerHTML = top.map((f, i) => cardHTML(f, i + 1)).join('');
+  }
+
+  function renderHeroMembersCurated() {
+    const total = {};
+    published().forEach(f => { total[f.memberId] = (total[f.memberId] || 0) + f.views; });
+    const top = Object.keys(total).filter(id => memberOf(id)).sort((a, b) => total[b] - total[a]).slice(0, 5);
+    $('hero-members').innerHTML = top.map(id => '<span class="chip clickable" data-member="' + esc(id) + '">#' + esc(memberOf(id).name) + '</span>').join('');
+  }
+
+  function renderMain() {
+    applyMode(); renderFilterControls(); renderList(); renderTrending(); renderHeroMembers();
+  }
+
+  /* --- 상세 --- */
+  function renderDetail(id) {
+    const f = getFancam(id, true);
+    const box = $('detail-body');
+    if (!f && fetchLiveDetail(id)) return;
+    if (!f) { box.innerHTML = '<div class="empty">찾을 수 없는 직캠이에요.<br><a href="#/" style="text-decoration:underline">목록으로 돌아가기</a></div>'; return; }
+    const g = groupOf(f.groupId), m = memberOf(f.memberId), s = songOf(f.songId);
+    const isFav = favs.fancams.includes(f.id);
+    const player = f.videoId
+      ? '<div class="player has-video"><iframe src="https://www.youtube-nocookie.com/embed/' + esc(f.videoId) + '" title="' + esc(f.title) + '" allow="accelerometer; encrypted-media; picture-in-picture" allowfullscreen></iframe></div>'
+      : '<div class="player">▶ 샘플 데이터라 영상이 없어요. 관리자 페이지에서 유튜브 링크를 등록하면 재생돼요.</div>';
+    const origin = f.videoId
+      ? '<a class="btn btn-primary" target="_blank" rel="noopener" href="https://www.youtube.com/watch?v=' + esc(f.videoId) + '">원본 채널에서 보기</a>'
+      : '<button class="btn btn-primary" disabled>원본 링크 없음(샘플)</button>';
+    const related = (f.live ? liveState.items.filter(x => x.id !== f.id) : published().filter(x => x.id !== f.id && x.songId === f.songId))
+      .sort((a, b) => ((b.stageDate === f.stageDate) - (a.stageDate === f.stageDate)) || (b.views - a.views)).slice(0, 6);
+    box.innerHTML =
+      '<section id="player-area">' + player + '</section>' +
+      '<section id="fancam-meta"><span class="card-tag">' + esc(f.stage || '미분류') + '</span>' +
+      '<h2>' + esc(f.title) + '</h2>' +
+      '<div class="card-meta">' + esc(f.channel) + ' · 조회수 ' + fmtViews(f.views) + (f.live ? ' · 업로드 ' : ' · 무대 ') + esc(f.stageDate) + '</div>' +
+      '<div class="row">' + (f.live ? '<span class="chip">' + esc(f.channel) + '</span>' : '<span class="chip">' + esc(g ? g.name : '-') + '</span><span class="chip">' + esc(m ? m.name : '-') + '</span><span class="chip">' + esc(s ? s.title : '-') + '</span>') +
+      '<button class="btn btn-ghost' + (isFav ? ' fav-on' : '') + '" id="btn-fav" data-id="' + esc(f.id) + '">' + (isFav ? '♥ 저장됨' : '♡ 즐겨찾기') + '</button>' +
+      (m ? '<button class="btn btn-ghost' + (favs.members.includes(m.id) ? ' fav-on' : '') + '" id="btn-fav-member" data-id="' + esc(m.id) + '">' + (favs.members.includes(m.id) ? '♥ ' : '♡ ') + esc(m.name) + '</button>' : '') +
+      origin + '</div></section>' +
+      '<section id="related-fancams"><h2 class="section-title">같은 곡, 다른 앵글 <span class="spark">✦</span></h2>' +
+      (related.length ? '<div class="card-grid">' + related.map(x => cardHTML(x)).join('') + '</div>' : '<div class="empty">같은 곡의 다른 직캠이 아직 없어요.</div>') +
+      '</section>' +
+      '<section id="report-button"><button id="btn-report" data-id="' + esc(f.id) + '">신고하기</button></section>';
+  }
+
+  /* --- 마이페이지 --- */
+  function renderMypage() {
+    const logged = !!user;
+    $('mypage-guard').hidden = logged; $('mypage-content').hidden = !logged;
+    if (!logged) return;
+    const fl = favs.fancams.map(id => getFancam(id, false)).filter(Boolean);
+    $('fav-fancam-grid').innerHTML = fl.length ? fl.map(f => cardHTML(f)).join('')
+      : '<div class="empty" style="grid-column:1/-1">아직 저장한 직캠이 없어요.<br>상세 페이지에서 ♡를 눌러 보세요.</div>';
+    $('fav-member-list').innerHTML = favs.members.map(id => {
+      const m = memberOf(id); if (!m) return '';
+      return '<a class="member" href="#/?member=' + esc(id) + '"><div class="avatar"></div>' + esc(m.name) + '</a>';
+    }).join('');
+    $('fav-member-hint').textContent = favs.members.length ? '멤버를 누르면 그 멤버의 직캠만 모아 볼 수 있어요.' : '아직 저장한 멤버가 없어요. 상세 페이지에서 멤버 버튼을 눌러 보세요.';
+  }
+
+  /* --- 관리자 --- */
+  function renderAdmin() {
+    const ok = isAdmin();
+    $('admin-guard').hidden = ok; $('admin-content').hidden = !ok;
+    if (!ok) return;
+    renderTagEditor();
+    renderReports();
+  }
+  function renderTagEditor() {
+    const drafts = fancams.filter(f => f.status === 'draft');
+    const sel = $('t-target');
+    sel.innerHTML = drafts.length
+      ? drafts.map(f => '<option value="' + esc(f.id) + '">' + esc(f.title || f.videoId) + '</option>').join('')
+      : '<option value="">태그 대기 중인 직캠이 없어요</option>';
+    fillSelect($('t-group'), GROUPS.map(g => ({ v: g.id, label: g.name })), '그룹', $('t-group').value);
+    updateTagDeps();
+    fillSelect($('t-stage'), STAGES.map(s => ({ v: s, label: s })), '무대 유형', $('t-stage').value);
+    if (!$('t-date').value) $('t-date').value = dayStr(0);
+  }
+  function updateTagDeps() {
+    const g = $('t-group').value;
+    fillSelect($('t-member'), MEMBERS.filter(m => !g || m.group === g).map(m => ({ v: m.id, label: m.name })), '멤버', $('t-member').value);
+    fillSelect($('t-song'), SONGS.filter(s => !g || s.group === g).map(s => ({ v: s.id, label: s.title })), '곡', $('t-song').value);
+  }
+  function renderReports() {
+    $('report-list').innerHTML = reports.length ? reports.slice().reverse().map(r => {
+      const f = findAny(r.fancamId);
+      const title = f ? f.title : '(삭제된 직캠)';
+      return '<div class="report-item' + (r.done ? ' done' : '') + '"><span>' + esc(title) + '<br><span class="meta">사유: ' + esc(r.reason) + ' · ' + esc(r.date) + '</span></span>' +
+        (r.done ? '<span class="meta">비공개 처리됨</span>' : '<button class="btn btn-ghost" data-hide="' + esc(r.id) + '">비공개 처리</button>') + '</div>';
+    }).join('') : '<div class="empty">접수된 신고가 없어요.</div>';
+  }
+
+  /* --- 상단 네비 --- */
+  function renderNav() {
+    $('btn-login').textContent = user ? '로그아웃' : '로그인';
+    $('nav-user').textContent = user ? user.name + '님' : '';
+    $('nav-admin-link').hidden = !isAdmin();
+  }
+
+  /* ---------- 5) 이벤트 ---------- */
+  function onMain() { return /^#\/($|\?)/.test(location.hash) || location.hash === '' || location.hash === '#'; }
+  function goSearch(q) {
+    filter.q = q; filter.limit = PAGE_SIZE;
+    writeFilterToURL();
+    if (!onMain()) { route(); }
+    else { renderFilterControls(); renderList(); }
+    const el = $('fancam-list'); if (el) el.scrollIntoView({ behavior: 'smooth' });
+  }
+  $('hero-form').addEventListener('submit', e => { e.preventDefault(); goSearch($('hero-input').value); });
+  $('nav-search-input').addEventListener('keydown', e => {
+    if (e.key === 'Enter') {
+      if (!onMain()) { readFilterFromURL(''); }
+      goSearch(e.target.value);
+    }
+  });
+  $('hero-members').addEventListener('click', e => {
+    const qc = e.target.closest('[data-q]');
+    if (qc) { filter.stage = ''; goSearch(qc.dataset.q); return; }
+    const c = e.target.closest('[data-member]'); if (!c) return;
+    const m = memberOf(c.dataset.member);
+    filter.group = m.group; filter.member = m.id; filter.song = ''; filter.limit = PAGE_SIZE;
+    writeFilterToURL(); renderFilterControls(); renderList();
+    $('fancam-list').scrollIntoView({ behavior: 'smooth' });
+  });
+
+  function onFilterChange(key) {
+    return function (e) {
+      filter[key] = e.target.value; filter.limit = PAGE_SIZE;
+      if (key === 'group') { filter.member = ''; filter.song = ''; }
+      writeFilterToURL(); renderFilterControls(); renderList();
+    };
+  }
+  $('f-group').addEventListener('change', onFilterChange('group'));
+  $('f-member').addEventListener('change', onFilterChange('member'));
+  $('f-song').addEventListener('change', onFilterChange('song'));
+  $('f-stage').addEventListener('change', onFilterChange('stage'));
+  $('f-period').addEventListener('change', onFilterChange('period'));
+  $('f-reset').addEventListener('click', () => {
+    Object.assign(filter, { q: '', group: '', member: '', song: '', stage: '', period: '', sort: 'latest', limit: PAGE_SIZE });
+    writeFilterToURL(); renderFilterControls(); renderList();
+  });
+  $('sort-chips').addEventListener('click', e => {
+    const c = e.target.closest('[data-sort]'); if (!c) return;
+    filter.sort = c.dataset.sort; filter.limit = PAGE_SIZE;
+    writeFilterToURL(); renderFilterControls(); renderList();
+  });
+  $('btn-more').addEventListener('click', () => { if (live()) { loadLive(true); return; } filter.limit += PAGE_SIZE; renderList(); });
+
+
+  /* 로그인 */
+  const dlg = $('login-dialog');
+  function openLogin() {
+    $('login-name').value = ''; $('login-admin').checked = false;
+    if (dlg.showModal) dlg.showModal(); else dlg.setAttribute('open', '');
+    setTimeout(() => $('login-name').focus(), 50);
+  }
+  $('btn-login').addEventListener('click', () => {
+    if (user) { user = null; save(KEY.user, null); toast('로그아웃했어요'); route(); }
+    else openLogin();
+  });
+  document.addEventListener('click', e => { if (e.target.closest('[data-open-login]')) openLogin(); });
+  $('login-form').addEventListener('submit', e => {
+    const v = e.submitter && e.submitter.value;
+    if (v !== 'ok') return;
+    user = { name: ($('login-name').value.trim() || '팬'), admin: $('login-admin').checked };
+    save(KEY.user, user); toast(user.name + '님 환영해요 ✦'); setTimeout(route, 0);
+  });
+
+  /* 상세 페이지 버튼 */
+  function currentDetailId() { const m = location.hash.match(/#\/fancam\/([^?]+)/); return m ? decodeURIComponent(m[1]) : ''; }
+  $('detail-body').addEventListener('click', e => {
+    const fav = e.target.closest('#btn-fav');
+    if (fav) {
+      if (!user) { toast('로그인하면 저장할 수 있어요'); openLogin(); return; }
+      const id = fav.dataset.id, i = favs.fancams.indexOf(id);
+      if (i >= 0) favs.fancams.splice(i, 1); else favs.fancams.push(id);
+      save(KEY.favs, favs); renderDetail(id); toast(i >= 0 ? '즐겨찾기에서 뺐어요' : '즐겨찾기에 저장했어요'); return;
+    }
+    const fm = e.target.closest('#btn-fav-member');
+    if (fm) {
+      if (!user) { toast('로그인하면 저장할 수 있어요'); openLogin(); return; }
+      const id = fm.dataset.id, i = favs.members.indexOf(id);
+      if (i >= 0) favs.members.splice(i, 1); else favs.members.push(id);
+      save(KEY.favs, favs); renderDetail(currentDetailId());
+      toast(i >= 0 ? '최애 멤버에서 뺐어요' : '최애 멤버로 저장했어요'); return;
+    }
+    const rp = e.target.closest('#btn-report');
+    if (rp) {
+      const reason = prompt('신고 사유를 간단히 적어 주세요.\n(예: 부적절한 영상, 잘못된 태그)');
+      if (reason && reason.trim()) {
+        reports.push({ id: 'r' + Date.now(), fancamId: rp.dataset.id, reason: reason.trim().slice(0, 80), date: dayStr(0), done: false });
+        save(KEY.reports, reports); toast('신고가 접수됐어요');
+      }
+    }
+  });
+
+  /* 관리자: 등록 */
+  $('a-fetch').addEventListener('click', async () => {
+    const vid = parseVideoId($('a-url').value);
+    if (!vid) { toast('유튜브 링크를 확인해 주세요'); return; }
+    const btn = $('a-fetch'); btn.disabled = true; btn.textContent = '불러오는 중...';
+    try {
+      const r = await fetch('https://noembed.com/embed?url=' + encodeURIComponent('https://www.youtube.com/watch?v=' + vid));
+      const j = await r.json();
+      if (j.title) { $('a-title').value = j.title; $('a-channel').value = j.author_name || ''; toast('제목을 불러왔어요'); }
+      else toast('자동으로 못 불러왔어요. 직접 입력해 주세요');
+    } catch (err) { toast('자동으로 못 불러왔어요. 직접 입력해 주세요'); }
+    btn.disabled = false; btn.textContent = '제목 불러오기';
+  });
+  $('a-add').addEventListener('click', () => {
+    const vid = parseVideoId($('a-url').value);
+    if (!vid) { toast('유튜브 링크를 확인해 주세요'); return; }
+    if (fancams.some(f => f.videoId === vid)) { toast('이미 등록된 영상이에요'); return; }
+    const title = $('a-title').value.trim();
+    if (!title) { toast('제목을 입력해 주세요'); return; }
+    fancams.push({
+      id: 'u' + Date.now(), videoId: vid, title: title, channel: $('a-channel').value.trim() || '채널 미상',
+      groupId: '', memberId: '', songId: '', stage: '', stageDate: dayStr(0), views: 0, status: 'draft', sample: false
+    });
+    save(KEY.fancams, fancams);
+    ['a-url', 'a-title', 'a-channel'].forEach(i => { $(i).value = ''; });
+    renderTagEditor(); toast('등록했어요. 아래에서 태그를 달아 공개하세요');
+  });
+  $('t-group').addEventListener('change', updateTagDeps);
+  $('t-save').addEventListener('click', () => {
+    const f = fancams.find(x => x.id === $('t-target').value);
+    if (!f) { toast('태그할 직캠이 없어요'); return; }
+    const g = $('t-group').value, m = $('t-member').value, s = $('t-song').value, st = $('t-stage').value, d = $('t-date').value;
+    if (!g || !m || !s || !st || !d) { toast('그룹·멤버·곡·무대·날짜를 모두 골라 주세요'); return; }
+    Object.assign(f, { groupId: g, memberId: m, songId: s, stage: st, stageDate: d, status: 'published' });
+    save(KEY.fancams, fancams); renderTagEditor(); toast('공개했어요. 메인 목록에 바로 나와요');
+  });
+  $('report-list').addEventListener('click', e => {
+    const b = e.target.closest('[data-hide]'); if (!b) return;
+    const r = reports.find(x => x.id === b.dataset.hide); if (!r) return;
+    const f = findAny(r.fancamId);
+    if (f) { if (f.live) { if (!hiddenLive.includes(f.id)) hiddenLive.push(f.id); save(HID_KEY, hiddenLive); liveState.items = liveState.items.filter(x => x.id !== f.id); } else f.status = 'hidden'; }
+    r.done = true; save(KEY.fancams, fancams); save(KEY.reports, reports); renderReports(); toast('비공개 처리했어요');
+  });
+
+  $('btn-reset-demo').addEventListener('click', () => {
+    if (!confirm('등록한 직캠, 즐겨찾기, 신고 내역이 모두 지워지고 처음 상태로 돌아가요. 계속할까요?')) return;
+    fancams = makeSeed(); favs = { fancams: [], members: [] }; reports = [];
+    save(KEY.fancams, fancams); save(KEY.favs, favs); save(KEY.reports, reports); hiddenLive = []; save(HID_KEY, hiddenLive);
+    toast('초기화했어요'); route();
+  });
+
+  /* ---------- 6) 라우터 ---------- */
+  function show(viewId) {
+    document.querySelectorAll('.view').forEach(v => v.classList.toggle('active', v.id === viewId));
+  }
+  let lastPath = null;
+  function route() {
+    const hash = location.hash || '#/';
+    const parts = hash.slice(1).split('?');
+    const path = parts[0] || '/', qs = parts[1] || '';
+    renderNav();
+    let m;
+    if ((m = path.match(/^\/fancam\/(.+)$/))) {
+      show('page-detail'); renderDetail(decodeURIComponent(m[1]));
+    } else if (path === '/mypage') {
+      show('page-mypage'); renderMypage();
+    } else if (path === '/admin') {
+      show('page-admin'); renderAdmin();
+    } else {
+      show('page-main'); readFilterFromURL(qs); renderMain();
+    }
+    if (path !== lastPath) window.scrollTo(0, 0);
+    lastPath = path;
+  }
+  window.addEventListener('hashchange', () => { if (skipNextRoute) { skipNextRoute = false; return; } route(); });
+  // 시작할 때 서버 연결 확인 → 연결되면 실제 유튜브 검색, 아니면 샘플 화면
+  (async function boot() {
+    try {
+      const ctl = new AbortController(); const t = setTimeout(() => ctl.abort(), 4000);
+      const r = await fetch('/api/youtube?path=ping', { signal: ctl.signal }); clearTimeout(t);
+      const j = await r.json(); serverOn = !!(j && j.ok);
+    } catch (e) { serverOn = false; }
+    route();
+  })();
+})();
+</script>
+</body>
+</html>
